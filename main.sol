@@ -67,3 +67,72 @@ contract fusha is ReentrancyGuard, Pausable {
     error Fusha_DestRetired();
     error Fusha_InvalidRegion();
     error Fusha_InvalidRating();
+    error Fusha_ReviewCooldown();
+    error Fusha_MaxReviewsPerDest();
+    error Fusha_EmptyItinerary();
+    error Fusha_ItineraryTooLong();
+    error Fusha_InvalidItineraryId();
+    error Fusha_NotItineraryCreator();
+    error Fusha_GuideAlreadyRegistered();
+    error Fusha_GuideNotRegistered();
+    error Fusha_Reentrancy();
+    error Fusha_ZeroAmount();
+    error Fusha_ArrayLengthMismatch();
+    error Fusha_BatchTooLarge();
+    error Fusha_MaxDestinationsReached();
+    error Fusha_InvalidIndex();
+    error Fusha_DurationOutOfRange();
+    error Fusha_InvalidSeasonRoller();
+
+    // -------------------------------------------------------------------------
+    // CONSTANTS (randomised within sensible ranges)
+    // -------------------------------------------------------------------------
+
+    uint256 public constant FUSHA_VERSION = 3;
+    uint256 public constant MAX_DESTINATIONS = 412;
+    uint256 public constant MAX_ITINERARY_STOPS = 28;
+    uint256 public constant MAX_ITINERARY_DAYS = 90;
+    uint256 public constant MIN_ITINERARY_DAYS = 1;
+    uint256 public constant REVIEW_COOLDOWN_BLOCKS = 217;
+    uint256 public constant MAX_REVIEWS_PER_DEST_PER_TRAVELER = 2;
+    uint256 public constant RATING_MIN = 1;
+    uint256 public constant RATING_MAX = 5;
+    uint256 public constant TIP_FEE_BP = 87;
+    uint256 public constant BP_DENOMINATOR = 10_000;
+    uint256 public constant MAX_REGION_CODE = 24;
+    uint256 public constant SEASON_BLOCKS = 604;
+    uint256 public constant MAX_BATCH_LIST = 19;
+    bytes32 public constant FUSHA_NAMESPACE = keccak256("fusha.travel.v3");
+    uint256 public constant MAX_TIP_WEI = 50 ether;
+
+    // -------------------------------------------------------------------------
+    // IMMUTABLES (EIP-55, 40 hex chars)
+    // -------------------------------------------------------------------------
+
+    address public immutable guideCurator;
+    address public immutable tipTreasury;
+    address public immutable council;
+    uint256 public immutable genesisBlock;
+    bytes32 public immutable configSeed;
+
+    // -------------------------------------------------------------------------
+    // STATE
+    // -------------------------------------------------------------------------
+
+    struct Destination {
+        bytes32 destId;
+        uint8 regionCode;
+        bytes32 nameHash;
+        uint256 listedAtBlock;
+        bool active;
+    }
+
+    struct Itinerary {
+        uint256 itineraryId;
+        bytes32[] destIds;
+        uint256 durationDays;
+        address creator;
+        uint256 createdAtBlock;
+        bool exists;
+    }
+
