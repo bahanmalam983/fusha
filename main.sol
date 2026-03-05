@@ -688,3 +688,72 @@ contract fusha is ReentrancyGuard, Pausable {
             REVIEW_COOLDOWN_BLOCKS,
             MAX_REVIEWS_PER_DEST_PER_TRAVELER,
             RATING_MIN,
+            RATING_MAX,
+            TIP_FEE_BP,
+            SEASON_BLOCKS
+        );
+    }
+
+    function currentBlockNumber() external view returns (uint256) {
+        return block.number;
+    }
+
+    function blocksUntilNextReviewAllowed(address traveler) external view returns (uint256) {
+        uint256 next = _lastReviewBlock[traveler] + REVIEW_COOLDOWN_BLOCKS;
+        if (block.number >= next) return 0;
+        return next - block.number;
+    }
+
+    function getReviewRange(uint256 fromIndex, uint256 limit) external view returns (
+        bytes32[] memory destIds,
+        address[] memory travelers,
+        uint8[] memory ratings,
+        uint256[] memory atBlocks
+    ) {
+        uint256 total = _reviews.length;
+        if (fromIndex >= total) return (new bytes32[](0), new address[](0), new uint8[](0), new uint256[](0));
+        uint256 end = fromIndex + limit;
+        if (end > total) end = total;
+        uint256 n = end - fromIndex;
+        destIds = new bytes32[](n);
+        travelers = new address[](n);
+        ratings = new uint8[](n);
+        atBlocks = new uint256[](n);
+        for (uint256 i = 0; i < n;) {
+            ReviewRecord storage r = _reviews[fromIndex + i];
+            destIds[i] = r.destId;
+            travelers[i] = r.traveler;
+            ratings[i] = r.rating;
+            atBlocks[i] = r.atBlock;
+            unchecked { ++i; }
+        }
+    }
+
+    function getTopRatedDestinations(uint256 limit) external view returns (bytes32[] memory destIds, uint256[] memory avgRatings) {
+        if (limit == 0 || _destIdList.length == 0) return (new bytes32[](0), new uint256[](0));
+        if (limit > _destIdList.length) limit = _destIdList.length;
+        uint256[] memory sums = new uint256[](_destIdList.length);
+        uint256[] memory counts = new uint256[](_destIdList.length);
+        for (uint256 i = 0; i < _reviews.length; i++) {
+            bytes32 did = _reviews[i].destId;
+            for (uint256 j = 0; j < _destIdList.length; j++) {
+                if (_destIdList[j] == did) {
+                    sums[j] += _reviews[i].rating;
+                    counts[j]++;
+                    break;
+                }
+            }
+        }
+        uint256[] memory indices = new uint256[](_destIdList.length);
+        for (uint256 i = 0; i < _destIdList.length; i++) indices[i] = i;
+        for (uint256 i = 0; i < _destIdList.length; i++) {
+            for (uint256 j = i + 1; j < _destIdList.length; j++) {
+                uint256 a = counts[indices[i]] == 0 ? 0 : (sums[indices[i]] * 1e18) / counts[indices[i]];
+                uint256 b = counts[indices[j]] == 0 ? 0 : (sums[indices[j]] * 1e18) / counts[indices[j]];
+                if (b > a) {
+                    (indices[i], indices[j]) = (indices[j], indices[i]);
+                }
+            }
+        }
+        uint256 outLen = limit;
+        destIds = new bytes32[](outLen);
