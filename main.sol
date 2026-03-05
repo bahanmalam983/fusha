@@ -343,3 +343,72 @@ contract fusha is ReentrancyGuard, Pausable {
         emit ItineraryEdited(itineraryId, block.number);
     }
 
+    // -------------------------------------------------------------------------
+    // REVIEWS (travelers)
+    // -------------------------------------------------------------------------
+
+    function postReview(bytes32 destId, uint8 rating, bytes32 reviewHash) external nonReentrant whenNotPaused {
+        if (destId == bytes32(0)) revert Fusha_ZeroDestId();
+        Destination storage d = _destinations[destId];
+        if (d.destId == bytes32(0) || !d.active) revert Fusha_DestNotFound();
+        if (rating < RATING_MIN || rating > RATING_MAX) revert Fusha_InvalidRating();
+        if (block.number < _lastReviewBlock[msg.sender] + REVIEW_COOLDOWN_BLOCKS) {
+            emit ReviewCooldown(_lastReviewBlock[msg.sender] + REVIEW_COOLDOWN_BLOCKS, msg.sender);
+            revert Fusha_ReviewCooldown();
+        }
+        if (_reviewCountByDestAndTraveler[destId][msg.sender] >= MAX_REVIEWS_PER_DEST_PER_TRAVELER) revert Fusha_MaxReviewsPerDest();
+        _lastReviewBlock[msg.sender] = block.number;
+        _reviewCountByDestAndTraveler[destId][msg.sender]++;
+        _reviews.push(ReviewRecord({
+            destId: destId,
+            traveler: msg.sender,
+            rating: rating,
+            reviewHash: reviewHash,
+            atBlock: block.number
+        }));
+        emit ReviewPosted(destId, msg.sender, rating, reviewHash, block.number);
+    }
+
+    // -------------------------------------------------------------------------
+    // TIPS (travelers -> guides, fee to treasury)
+    // -------------------------------------------------------------------------
+
+    function sendTip(address guide) external payable nonReentrant whenNotPaused {
+        if (guide == address(0)) revert Fusha_ZeroAddress();
+        if (msg.value == 0) revert Fusha_ZeroAmount();
+        if (msg.value > MAX_TIP_WEI) revert Fusha_ZeroAmount();
+        if (!_guideListed[guide]) revert Fusha_GuideNotRegistered();
+        uint256 feeWei = (msg.value * TIP_FEE_BP) / BP_DENOMINATOR;
+        uint256 toGuide = msg.value - feeWei;
+        totalTipsWei += msg.value;
+        totalTipsFeesWei += feeWei;
+        treasuryBalance += feeWei;
+        (bool ok,) = guide.call{ value: toGuide }("");
+        require(ok, "Fusha: transfer failed");
+        emit TipSent(msg.sender, guide, msg.value, feeWei, block.number);
+    }
+
+    function topTreasury() external payable {
+        if (msg.value == 0) return;
+        treasuryBalance += msg.value;
+        emit TreasuryTopped(msg.value, msg.sender, block.number);
+    }
+
+    // -------------------------------------------------------------------------
+    // GUIDES (curator)
+    // -------------------------------------------------------------------------
+
+    function registerGuide(address guide, bytes32 profileHash) external onlyCurator whenNotPaused {
+        if (guide == address(0)) revert Fusha_ZeroAddress();
+        if (_guideListed[guide]) revert Fusha_GuideAlreadyRegistered();
+        _guideProfiles[guide] = profileHash;
+        _guideListed[guide] = true;
+        _guideList.push(guide);
+        emit GuideRegistered(guide, profileHash, block.number);
+    }
+
+    function unlistGuide(address guide) external onlyCurator whenNotPaused {
+        if (guide == address(0)) revert Fusha_ZeroAddress();
+        if (!_guideListed[guide]) revert Fusha_GuideNotRegistered();
+        _guideListed[guide] = false;
+        emit GuideUnlisted(guide, block.number);
