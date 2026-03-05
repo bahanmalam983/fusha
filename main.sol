@@ -205,3 +205,72 @@ contract fusha is ReentrancyGuard, Pausable {
         ids[21] = keccak256("dest_okinawa_churaumi");
         regions[0] = 0; regions[1] = 0; regions[2] = 0; regions[3] = 1;
         regions[4] = 2; regions[5] = 3; regions[6] = 4; regions[7] = 5;
+        regions[8] = 6; regions[9] = 7; regions[10] = 8; regions[11] = 2;
+        regions[12] = 0; regions[13] = 0; regions[14] = 1; regions[15] = 2;
+        regions[16] = 4; regions[17] = 9; regions[18] = 7; regions[19] = 0;
+        regions[20] = 0; regions[21] = 0;
+        for (uint256 i = 0; i < ids.length && _destIdList.length < MAX_DESTINATIONS; i++) {
+            if (_destinations[ids[i]].destId != bytes32(0)) continue;
+            _destinations[ids[i]] = Destination({
+                destId: ids[i],
+                regionCode: regions[i],
+                nameHash: keccak256(abi.encodePacked(ids[i], block.number + i)),
+                listedAtBlock: block.number,
+                active: true
+            });
+            _destIdList.push(ids[i]);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // MODIFIERS
+    // -------------------------------------------------------------------------
+
+    modifier onlyCurator() {
+        if (msg.sender != guideCurator) revert Fusha_NotCurator();
+        _;
+    }
+
+    modifier onlyCouncil() {
+        if (msg.sender != council) revert Fusha_NotCouncil();
+        _;
+    }
+
+    modifier nonReentrant() {
+        if (_guard != 0) revert Fusha_Reentrancy();
+        _guard = 1;
+        _;
+        _guard = 0;
+    }
+
+    // -------------------------------------------------------------------------
+    // DESTINATIONS (curator)
+    // -------------------------------------------------------------------------
+
+    function listDestination(bytes32 destId, uint8 regionCode, bytes32 nameHash) external onlyCurator whenNotPaused {
+        if (destId == bytes32(0)) revert Fusha_ZeroDestId();
+        if (_destinations[destId].destId != bytes32(0)) revert Fusha_DestAlreadyListed();
+        if (_destIdList.length >= MAX_DESTINATIONS) revert Fusha_MaxDestinationsReached();
+        if (regionCode > MAX_REGION_CODE) revert Fusha_InvalidRegion();
+        _destinations[destId] = Destination({
+            destId: destId,
+            regionCode: regionCode,
+            nameHash: nameHash,
+            listedAtBlock: block.number,
+            active: true
+        });
+        _destIdList.push(destId);
+        emit DestinationListed(destId, regionCode, nameHash, block.number, msg.sender);
+    }
+
+    function listDestinationBatch(
+        bytes32[] calldata destIds,
+        uint8[] calldata regionCodes,
+        bytes32[] calldata nameHashes
+    ) external onlyCurator whenNotPaused {
+        uint256 n = destIds.length;
+        if (n == 0 || n > MAX_BATCH_LIST) revert Fusha_BatchTooLarge();
+        if (n != regionCodes.length || n != nameHashes.length) revert Fusha_ArrayLengthMismatch();
+        if (_destIdList.length + n > MAX_DESTINATIONS) revert Fusha_MaxDestinationsReached();
+        for (uint256 i = 0; i < n;) {
+            bytes32 did = destIds[i];
