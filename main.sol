@@ -757,3 +757,72 @@ contract fusha is ReentrancyGuard, Pausable {
         }
         uint256 outLen = limit;
         destIds = new bytes32[](outLen);
+        avgRatings = new uint256[](outLen);
+        for (uint256 i = 0; i < outLen; i++) {
+            uint256 idx = indices[i];
+            destIds[i] = _destIdList[idx];
+            avgRatings[i] = counts[idx] == 0 ? 0 : (sums[idx] * 1e18) / counts[idx];
+        }
+    }
+
+    function treasuryWithdraw(uint256 amountWei) external {
+        if (msg.sender != tipTreasury) revert Fusha_NotCouncil();
+        if (amountWei == 0 || amountWei > treasuryBalance) revert Fusha_ZeroAmount();
+        treasuryBalance -= amountWei;
+        (bool ok,) = msg.sender.call{ value: amountWei }("");
+        require(ok, "Fusha: withdraw failed");
+    }
+
+    receive() external payable {
+        treasuryBalance += msg.value;
+        emit TreasuryTopped(msg.value, msg.sender, block.number);
+    }
+
+    // -------------------------------------------------------------------------
+    // EXTRA VIEWS: Destinations (pagination, filters)
+    // -------------------------------------------------------------------------
+
+    function getActiveDestinations(uint256 fromIndex, uint256 limit) external view returns (
+        bytes32[] memory destIds,
+        uint8[] memory regionCodes,
+        bytes32[] memory nameHashes
+    ) {
+        uint256 total = _destIdList.length;
+        uint256 activeCount = 0;
+        for (uint256 i = 0; i < total; i++) {
+            if (_destinations[_destIdList[i]].active) activeCount++;
+        }
+        if (fromIndex >= activeCount) return (new bytes32[](0), new uint8[](0), new bytes32[](0));
+        uint256 end = fromIndex + limit;
+        if (end > activeCount) end = activeCount;
+        uint256 n = end - fromIndex;
+        destIds = new bytes32[](n);
+        regionCodes = new uint8[](n);
+        nameHashes = new bytes32[](n);
+        uint256 skipped = 0;
+        uint256 j = 0;
+        for (uint256 i = 0; i < total && j < n; i++) {
+            Destination storage d = _destinations[_destIdList[i]];
+            if (!d.active) continue;
+            if (skipped < fromIndex) { skipped++; continue; }
+            destIds[j] = d.destId;
+            regionCodes[j] = d.regionCode;
+            nameHashes[j] = d.nameHash;
+            j++;
+        }
+    }
+
+    function activeDestinationCount() external view returns (uint256) {
+        uint256 c = 0;
+        for (uint256 i = 0; i < _destIdList.length; i++) {
+            if (_destinations[_destIdList[i]].active) c++;
+        }
+        return c;
+    }
+
+    function getDestinationsByIds(bytes32[] calldata ids) external view returns (
+        uint8[] memory regionCodes,
+        bytes32[] memory nameHashes,
+        bool[] memory activeFlags
+    ) {
+        uint256 n = ids.length;
