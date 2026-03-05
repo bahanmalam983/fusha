@@ -136,3 +136,72 @@ contract fusha is ReentrancyGuard, Pausable {
         bool exists;
     }
 
+    struct ReviewRecord {
+        bytes32 destId;
+        address traveler;
+        uint8 rating;
+        bytes32 reviewHash;
+        uint256 atBlock;
+    }
+
+    mapping(bytes32 => Destination) private _destinations;
+    bytes32[] private _destIdList;
+    mapping(uint256 => Itinerary) private _itineraries;
+    uint256 private _itineraryCounter;
+    ReviewRecord[] private _reviews;
+    mapping(bytes32 => mapping(address => uint256)) private _reviewCountByDestAndTraveler;
+    mapping(address => uint256) private _lastReviewBlock;
+    mapping(address => bytes32) private _guideProfiles;
+    mapping(address => bool) private _guideListed;
+    address[] private _guideList;
+    uint256 public currentSeason;
+    uint256 public totalTipsWei;
+    uint256 public totalTipsFeesWei;
+    uint256 public treasuryBalance;
+    uint256 private _guard;
+
+    // -------------------------------------------------------------------------
+    // CONSTRUCTOR
+    // -------------------------------------------------------------------------
+
+    constructor() {
+        guideCurator = address(0x7E2c4A8f0B3d6E9a1C5f8D2b5e0A3c6D9F1b4E7a0);
+        tipTreasury = address(0x9A1c3e5B7d0F2a4C6e8A0b2D4f6A8c0E2b4D6F8a0);
+        council = address(0x2D5F8a1B4e7C0f3A6d9E2b5F8a1C4e7D0f3A6B9e2);
+        genesisBlock = block.number;
+        configSeed = keccak256(abi.encodePacked(block.timestamp, block.prevrandao, block.chainid));
+        currentSeason = 0;
+        totalTipsWei = 0;
+        totalTipsFeesWei = 0;
+        treasuryBalance = 0;
+        _itineraryCounter = 0;
+        _seedInitialDestinations();
+    }
+
+    function _seedInitialDestinations() private {
+        bytes32[] memory ids = new bytes32[](22);
+        uint8[] memory regions = new uint8[](22);
+        ids[0] = keccak256("dest_tokyo_shibuya");
+        ids[1] = keccak256("dest_kyoto_fushimi");
+        ids[2] = keccak256("dest_osaka_dotonbori");
+        ids[3] = keccak256("dest_seoul_myeongdong");
+        ids[4] = keccak256("dest_bangkok_khaosan");
+        ids[5] = keccak256("dest_taipei_101");
+        ids[6] = keccak256("dest_hanoi_old_quarter");
+        ids[7] = keccak256("dest_singapore_marina");
+        ids[8] = keccak256("dest_hong_kong_kowloon");
+        ids[9] = keccak256("dest_shanghai_bund");
+        ids[10] = keccak256("dest_bali_ubud");
+        ids[11] = keccak256("dest_phuket_patong");
+        ids[12] = keccak256("dest_nara_todaiji");
+        ids[13] = keccak256("dest_hiroshima_miyajima");
+        ids[14] = keccak256("dest_busan_haeundae");
+        ids[15] = keccak256("dest_chiang_mai_old_city");
+        ids[16] = keccak256("dest_ho_chi_minh_pham_ngu_lao");
+        ids[17] = keccak256("dest_kuala_lumpur_petronas");
+        ids[18] = keccak256("dest_beijing_forbidden");
+        ids[19] = keccak256("dest_nagoya_castle");
+        ids[20] = keccak256("dest_sapporo_odori");
+        ids[21] = keccak256("dest_okinawa_churaumi");
+        regions[0] = 0; regions[1] = 0; regions[2] = 0; regions[3] = 1;
+        regions[4] = 2; regions[5] = 3; regions[6] = 4; regions[7] = 5;
