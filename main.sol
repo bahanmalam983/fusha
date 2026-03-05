@@ -274,3 +274,72 @@ contract fusha is ReentrancyGuard, Pausable {
         if (_destIdList.length + n > MAX_DESTINATIONS) revert Fusha_MaxDestinationsReached();
         for (uint256 i = 0; i < n;) {
             bytes32 did = destIds[i];
+            if (did != bytes32(0) && _destinations[did].destId == bytes32(0) && regionCodes[i] <= MAX_REGION_CODE) {
+                _destinations[did] = Destination({
+                    destId: did,
+                    regionCode: regionCodes[i],
+                    nameHash: nameHashes[i],
+                    listedAtBlock: block.number,
+                    active: true
+                });
+                _destIdList.push(did);
+            }
+            unchecked { ++i; }
+        }
+        emit BatchDestinationsListed(n, block.number);
+    }
+
+    function updateDestination(bytes32 destId, bytes32 nameHash) external onlyCurator whenNotPaused {
+        if (destId == bytes32(0)) revert Fusha_ZeroDestId();
+        Destination storage d = _destinations[destId];
+        if (d.destId == bytes32(0) || !d.active) revert Fusha_DestNotFound();
+        d.nameHash = nameHash;
+        emit DestinationUpdated(destId, nameHash, block.number);
+    }
+
+    function retireDestination(bytes32 destId) external onlyCurator whenNotPaused {
+        if (destId == bytes32(0)) revert Fusha_ZeroDestId();
+        Destination storage d = _destinations[destId];
+        if (d.destId == bytes32(0)) revert Fusha_DestNotFound();
+        d.active = false;
+        emit DestinationRetired(destId, block.number);
+    }
+
+    // -------------------------------------------------------------------------
+    // ITINERARIES (anyone)
+    // -------------------------------------------------------------------------
+
+    function createItinerary(bytes32[] calldata destIds, uint256 durationDays) external whenNotPaused returns (uint256 itineraryId) {
+        if (destIds.length == 0) revert Fusha_EmptyItinerary();
+        if (destIds.length > MAX_ITINERARY_STOPS) revert Fusha_ItineraryTooLong();
+        if (durationDays < MIN_ITINERARY_DAYS || durationDays > MAX_ITINERARY_DAYS) revert Fusha_DurationOutOfRange();
+        itineraryId = ++_itineraryCounter;
+        bytes32[] memory stored = new bytes32[](destIds.length);
+        for (uint256 i = 0; i < destIds.length;) {
+            stored[i] = destIds[i];
+            unchecked { ++i; }
+        }
+        _itineraries[itineraryId] = Itinerary({
+            itineraryId: itineraryId,
+            destIds: stored,
+            durationDays: durationDays,
+            creator: msg.sender,
+            createdAtBlock: block.number,
+            exists: true
+        });
+        emit ItineraryCreated(itineraryId, stored, durationDays, msg.sender, block.number);
+        return itineraryId;
+    }
+
+    function editItinerary(uint256 itineraryId, bytes32[] calldata destIds, uint256 durationDays) external whenNotPaused {
+        if (itineraryId == 0 || !_itineraries[itineraryId].exists) revert Fusha_InvalidItineraryId();
+        Itinerary storage it = _itineraries[itineraryId];
+        if (it.creator != msg.sender) revert Fusha_NotItineraryCreator();
+        if (destIds.length == 0) revert Fusha_EmptyItinerary();
+        if (destIds.length > MAX_ITINERARY_STOPS) revert Fusha_ItineraryTooLong();
+        if (durationDays < MIN_ITINERARY_DAYS || durationDays > MAX_ITINERARY_DAYS) revert Fusha_DurationOutOfRange();
+        it.destIds = destIds;
+        it.durationDays = durationDays;
+        emit ItineraryEdited(itineraryId, block.number);
+    }
+
