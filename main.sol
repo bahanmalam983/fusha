@@ -481,3 +481,72 @@ contract fusha is ReentrancyGuard, Pausable {
         uint256 total = _destIdList.length;
         if (fromIndex >= total) return (new bytes32[](0), new uint8[](0), new bool[](0));
         uint256 end = fromIndex + limit;
+        if (end > total) end = total;
+        uint256 n = end - fromIndex;
+        destIds = new bytes32[](n);
+        regionCodes = new uint8[](n);
+        activeFlags = new bool[](n);
+        for (uint256 i = 0; i < n;) {
+            bytes32 did = _destIdList[fromIndex + i];
+            Destination storage d = _destinations[did];
+            destIds[i] = d.destId;
+            regionCodes[i] = d.regionCode;
+            activeFlags[i] = d.active;
+            unchecked { ++i; }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // VIEWS: Itineraries
+    // -------------------------------------------------------------------------
+
+    function getItinerary(uint256 itineraryId) external view returns (
+        uint256 id,
+        bytes32[] memory destIds,
+        uint256 durationDays,
+        address creator,
+        uint256 createdAtBlock
+    ) {
+        if (itineraryId == 0 || !_itineraries[itineraryId].exists) revert Fusha_InvalidItineraryId();
+        Itinerary storage it = _itineraries[itineraryId];
+        return (it.itineraryId, it.destIds, it.durationDays, it.creator, it.createdAtBlock);
+    }
+
+    function itineraryExists(uint256 itineraryId) external view returns (bool) {
+        return _itineraries[itineraryId].exists;
+    }
+
+    function totalItineraries() external view returns (uint256) {
+        return _itineraryCounter;
+    }
+
+    function getItineraryDestIds(uint256 itineraryId) external view returns (bytes32[] memory) {
+        if (itineraryId == 0 || !_itineraries[itineraryId].exists) revert Fusha_InvalidItineraryId();
+        return _itineraries[itineraryId].destIds;
+    }
+
+    // -------------------------------------------------------------------------
+    // VIEWS: Reviews
+    // -------------------------------------------------------------------------
+
+    function reviewCount() external view returns (uint256) {
+        return _reviews.length;
+    }
+
+    function getReview(uint256 index) external view returns (
+        bytes32 destId,
+        address traveler,
+        uint8 rating,
+        bytes32 reviewHash,
+        uint256 atBlock
+    ) {
+        if (index >= _reviews.length) revert Fusha_InvalidIndex();
+        ReviewRecord storage r = _reviews[index];
+        return (r.destId, r.traveler, r.rating, r.reviewHash, r.atBlock);
+    }
+
+    function getReviewsForDestination(bytes32 destId, uint256 fromIndex, uint256 limit) external view returns (
+        address[] memory travelers,
+        uint8[] memory ratings,
+        uint256[] memory atBlocks
+    ) {
