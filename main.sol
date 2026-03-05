@@ -550,3 +550,72 @@ contract fusha is ReentrancyGuard, Pausable {
         uint8[] memory ratings,
         uint256[] memory atBlocks
     ) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < _reviews.length; i++) {
+            if (_reviews[i].destId == destId) count++;
+        }
+        if (fromIndex >= count) return (new address[](0), new uint8[](0), new uint256[](0));
+        uint256 end = fromIndex + limit;
+        if (end > count) end = count;
+        uint256 n = end - fromIndex;
+        travelers = new address[](n);
+        ratings = new uint8[](n);
+        atBlocks = new uint256[](n);
+        uint256 skipped = 0;
+        uint256 j = 0;
+        for (uint256 i = 0; i < _reviews.length && j < n; i++) {
+            if (_reviews[i].destId != destId) continue;
+            if (skipped < fromIndex) { skipped++; continue; }
+            travelers[j] = _reviews[i].traveler;
+            ratings[j] = _reviews[i].rating;
+            atBlocks[j] = _reviews[i].atBlock;
+            j++;
+        }
+    }
+
+    function averageRatingForDestination(bytes32 destId) external view returns (uint256 sum, uint256 count) {
+        for (uint256 i = 0; i < _reviews.length; i++) {
+            if (_reviews[i].destId == destId) {
+                sum += _reviews[i].rating;
+                count++;
+            }
+        }
+    }
+
+    function lastReviewBlockOf(address traveler) external view returns (uint256) {
+        return _lastReviewBlock[traveler];
+    }
+
+    function reviewCountForDestAndTraveler(bytes32 destId, address traveler) external view returns (uint256) {
+        return _reviewCountByDestAndTraveler[destId][traveler];
+    }
+
+    function canPostReview(address traveler, bytes32 destId) external view returns (bool) {
+        if (destId == bytes32(0)) return false;
+        if (_destinations[destId].destId == bytes32(0) || !_destinations[destId].active) return false;
+        if (block.number < _lastReviewBlock[traveler] + REVIEW_COOLDOWN_BLOCKS) return false;
+        return _reviewCountByDestAndTraveler[destId][traveler] < MAX_REVIEWS_PER_DEST_PER_TRAVELER;
+    }
+
+    // -------------------------------------------------------------------------
+    // VIEWS: Guides
+    // -------------------------------------------------------------------------
+
+    function isGuide(address account) external view returns (bool) {
+        return _guideListed[account];
+    }
+
+    function guideProfile(address guide) external view returns (bytes32) {
+        return _guideProfiles[guide];
+    }
+
+    function guideListLength() external view returns (uint256) {
+        return _guideList.length;
+    }
+
+    function guideAt(uint256 index) external view returns (address) {
+        if (index >= _guideList.length) revert Fusha_InvalidIndex();
+        return _guideList[index];
+    }
+
+    // -------------------------------------------------------------------------
