@@ -619,3 +619,72 @@ contract fusha is ReentrancyGuard, Pausable {
     }
 
     // -------------------------------------------------------------------------
+    // VIEWS: Config & snapshot
+    // -------------------------------------------------------------------------
+
+    function getCurator() external view returns (address) {
+        return guideCurator;
+    }
+
+    function getTreasury() external view returns (address) {
+        return tipTreasury;
+    }
+
+    function getCouncil() external view returns (address) {
+        return council;
+    }
+
+    function getGenesisBlock() external view returns (uint256) {
+        return genesisBlock;
+    }
+
+    function getConfigSeed() external view returns (bytes32) {
+        return configSeed;
+    }
+
+    function getVersion() external pure returns (uint256) {
+        return FUSHA_VERSION;
+    }
+
+    function getNamespace() external pure returns (bytes32) {
+        return FUSHA_NAMESPACE;
+    }
+
+    function getSnapshot() external view returns (
+        uint256 destCount,
+        uint256 itineraryCount,
+        uint256 reviewCount_,
+        uint256 season,
+        uint256 totalTips,
+        uint256 totalFees,
+        uint256 treasuryBal
+    ) {
+        return (
+            _destIdList.length,
+            _itineraryCounter,
+            _reviews.length,
+            currentSeason,
+            totalTipsWei,
+            totalTipsFeesWei,
+            treasuryBalance
+        );
+    }
+
+    function getConstants() external pure returns (
+        uint256 maxDestinations,
+        uint256 maxItineraryStops,
+        uint256 maxItineraryDays,
+        uint256 reviewCooldownBlocks,
+        uint256 maxReviewsPerDestPerTraveler,
+        uint256 ratingMin,
+        uint256 ratingMax,
+        uint256 tipFeeBp,
+        uint256 seasonBlocks
+    ) {
+        return (
+            MAX_DESTINATIONS,
+            MAX_ITINERARY_STOPS,
+            MAX_ITINERARY_DAYS,
+            REVIEW_COOLDOWN_BLOCKS,
+            MAX_REVIEWS_PER_DEST_PER_TRAVELER,
+            RATING_MIN,
