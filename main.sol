@@ -826,3 +826,72 @@ contract fusha is ReentrancyGuard, Pausable {
         bool[] memory activeFlags
     ) {
         uint256 n = ids.length;
+        regionCodes = new uint8[](n);
+        nameHashes = new bytes32[](n);
+        activeFlags = new bool[](n);
+        for (uint256 i = 0; i < n;) {
+            Destination storage d = _destinations[ids[i]];
+            if (d.destId != bytes32(0)) {
+                regionCodes[i] = d.regionCode;
+                nameHashes[i] = d.nameHash;
+                activeFlags[i] = d.active;
+            }
+            unchecked { ++i; }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // EXTRA VIEWS: Itineraries (bulk, by creator)
+    // -------------------------------------------------------------------------
+
+    function getItineraryIdsRange(uint256 fromId, uint256 limit) external view returns (uint256[] memory ids) {
+        uint256 maxId = _itineraryCounter;
+        if (fromId > maxId) return new uint256[](0);
+        uint256 end = fromId + limit;
+        if (end > maxId + 1) end = maxId + 1;
+        uint256 n = 0;
+        for (uint256 id = fromId; id < end; id++) {
+            if (_itineraries[id].exists) n++;
+        }
+        ids = new uint256[](n);
+        uint256 j = 0;
+        for (uint256 id = fromId; id < end; id++) {
+            if (_itineraries[id].exists) ids[j++] = id;
+        }
+    }
+
+    function getItineraryCountByCreator(address creator) external view returns (uint256) {
+        uint256 c = 0;
+        for (uint256 id = 1; id <= _itineraryCounter; id++) {
+            if (_itineraries[id].exists && _itineraries[id].creator == creator) c++;
+        }
+        return c;
+    }
+
+    function getItinerariesByCreator(address creator, uint256 fromIndex, uint256 limit) external view returns (
+        uint256[] memory itineraryIds,
+        uint256[] memory stopCounts,
+        uint256[] memory durationDays
+    ) {
+        uint256 total = 0;
+        for (uint256 id = 1; id <= _itineraryCounter; id++) {
+            if (_itineraries[id].exists && _itineraries[id].creator == creator) total++;
+        }
+        if (fromIndex >= total) return (new uint256[](0), new uint256[](0), new uint256[](0));
+        uint256 end = fromIndex + limit;
+        if (end > total) end = total;
+        uint256 n = end - fromIndex;
+        itineraryIds = new uint256[](n);
+        stopCounts = new uint256[](n);
+        durationDays = new uint256[](n);
+        uint256 skipped = 0;
+        uint256 j = 0;
+        for (uint256 id = 1; id <= _itineraryCounter && j < n; id++) {
+            if (!_itineraries[id].exists || _itineraries[id].creator != creator) continue;
+            if (skipped < fromIndex) { skipped++; continue; }
+            itineraryIds[j] = id;
+            stopCounts[j] = _itineraries[id].destIds.length;
+            durationDays[j] = _itineraries[id].durationDays;
+            j++;
+        }
+    }
