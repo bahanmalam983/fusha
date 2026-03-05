@@ -412,3 +412,72 @@ contract fusha is ReentrancyGuard, Pausable {
         if (!_guideListed[guide]) revert Fusha_GuideNotRegistered();
         _guideListed[guide] = false;
         emit GuideUnlisted(guide, block.number);
+    }
+
+    // -------------------------------------------------------------------------
+    // COUNCIL (pause, season)
+    // -------------------------------------------------------------------------
+
+    function togglePause() external onlyCouncil {
+        if (paused()) _unpause(); else _pause();
+        emit CouncilToggledPause(paused(), block.number);
+    }
+
+    function advanceSeason() external {
+        if (msg.sender != guideCurator && msg.sender != council) revert Fusha_InvalidSeasonRoller();
+        uint256 prev = currentSeason;
+        currentSeason++;
+        emit SeasonAdvanced(prev, currentSeason, block.number);
+    }
+
+    // -------------------------------------------------------------------------
+    // VIEWS: Destinations
+    // -------------------------------------------------------------------------
+
+    function destinationCount() external view returns (uint256) {
+        return _destIdList.length;
+    }
+
+    function destIdAt(uint256 index) external view returns (bytes32) {
+        if (index >= _destIdList.length) revert Fusha_InvalidIndex();
+        return _destIdList[index];
+    }
+
+    function getDestination(bytes32 destId) external view returns (
+        bytes32 id,
+        uint8 regionCode,
+        bytes32 nameHash,
+        uint256 listedAtBlock,
+        bool active
+    ) {
+        Destination storage d = _destinations[destId];
+        if (d.destId == bytes32(0)) revert Fusha_DestNotFound();
+        return (d.destId, d.regionCode, d.nameHash, d.listedAtBlock, d.active);
+    }
+
+    function isDestinationActive(bytes32 destId) external view returns (bool) {
+        return _destinations[destId].active && _destinations[destId].destId != bytes32(0);
+    }
+
+    function getDestinationsByRegion(uint8 regionCode) external view returns (bytes32[] memory ids) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < _destIdList.length; i++) {
+            if (_destinations[_destIdList[i]].regionCode == regionCode && _destinations[_destIdList[i]].active) count++;
+        }
+        ids = new bytes32[](count);
+        uint256 j = 0;
+        for (uint256 i = 0; i < _destIdList.length; i++) {
+            if (_destinations[_destIdList[i]].regionCode == regionCode && _destinations[_destIdList[i]].active) {
+                ids[j++] = _destIdList[i];
+            }
+        }
+    }
+
+    function getDestinationRange(uint256 fromIndex, uint256 limit) external view returns (
+        bytes32[] memory destIds,
+        uint8[] memory regionCodes,
+        bool[] memory activeFlags
+    ) {
+        uint256 total = _destIdList.length;
+        if (fromIndex >= total) return (new bytes32[](0), new uint8[](0), new bool[](0));
+        uint256 end = fromIndex + limit;
