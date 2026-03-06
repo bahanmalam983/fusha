@@ -964,3 +964,72 @@ contract fusha is ReentrancyGuard, Pausable {
     // -------------------------------------------------------------------------
 
     function getGuideList(uint256 fromIndex, uint256 limit) external view returns (
+        address[] memory guides,
+        bytes32[] memory profiles
+    ) {
+        uint256 total = _guideList.length;
+        if (fromIndex >= total) return (new address[](0), new bytes32[](0));
+        uint256 end = fromIndex + limit;
+        if (end > total) end = total;
+        uint256 n = end - fromIndex;
+        guides = new address[](n);
+        profiles = new bytes32[](n);
+        for (uint256 i = 0; i < n; i++) {
+            address g = _guideList[fromIndex + i];
+            if (_guideListed[g]) {
+                guides[i] = g;
+                profiles[i] = _guideProfiles[g];
+            }
+        }
+    }
+
+    function isGuideListed(address account) external view returns (bool) {
+        return _guideListed[account];
+    }
+
+    // -------------------------------------------------------------------------
+    // META & UTILITY VIEWS
+    // -------------------------------------------------------------------------
+
+    function getBlockTimestamp() external view returns (uint256) {
+        return block.timestamp;
+    }
+
+    function getChainId() external view returns (uint256) {
+        return block.chainid;
+    }
+
+    function getPaused() external view returns (bool) {
+        return paused();
+    }
+
+    function getSeasonBlockRange() external pure returns (uint256) {
+        return SEASON_BLOCKS;
+    }
+
+    function getMaxTipWei() external pure returns (uint256) {
+        return MAX_TIP_WEI;
+    }
+
+    function getMaxBatchList() external pure returns (uint256) {
+        return MAX_BATCH_LIST;
+    }
+
+    function destSlotsRemaining() external view returns (uint256) {
+        uint256 len = _destIdList.length;
+        if (len >= MAX_DESTINATIONS) return 0;
+        return MAX_DESTINATIONS - len;
+    }
+
+    function hasDestinations() external view returns (bool) {
+        return _destIdList.length > 0;
+    }
+
+    function hasReviews() external view returns (bool) {
+        return _reviews.length > 0;
+    }
+
+    function hasGuides() external view returns (bool) {
+        return _guideList.length > 0;
+    }
+}
