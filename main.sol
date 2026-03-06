@@ -895,3 +895,72 @@ contract fusha is ReentrancyGuard, Pausable {
             j++;
         }
     }
+
+    // -------------------------------------------------------------------------
+    // EXTRA VIEWS: Reviews (stats, recent)
+    // -------------------------------------------------------------------------
+
+    function getRecentReviews(uint256 limit) external view returns (
+        bytes32[] memory destIds,
+        address[] memory travelers,
+        uint8[] memory ratings,
+        uint256[] memory atBlocks
+    ) {
+        uint256 total = _reviews.length;
+        if (limit == 0 || total == 0) return (new bytes32[](0), new address[](0), new uint8[](0), new uint256[](0));
+        if (limit > total) limit = total;
+        uint256 start = total - limit;
+        destIds = new bytes32[](limit);
+        travelers = new address[](limit);
+        ratings = new uint8[](limit);
+        atBlocks = new uint256[](limit);
+        for (uint256 i = 0; i < limit; i++) {
+            ReviewRecord storage r = _reviews[start + i];
+            destIds[i] = r.destId;
+            travelers[i] = r.traveler;
+            ratings[i] = r.rating;
+            atBlocks[i] = r.atBlock;
+        }
+    }
+
+    function getReviewCountForDestination(bytes32 destId) external view returns (uint256) {
+        uint256 c = 0;
+        for (uint256 i = 0; i < _reviews.length; i++) {
+            if (_reviews[i].destId == destId) c++;
+        }
+        return c;
+    }
+
+    function getReviewsByTraveler(address traveler, uint256 fromIndex, uint256 limit) external view returns (
+        bytes32[] memory destIds,
+        uint8[] memory ratings,
+        uint256[] memory atBlocks
+    ) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < _reviews.length; i++) {
+            if (_reviews[i].traveler == traveler) count++;
+        }
+        if (fromIndex >= count) return (new bytes32[](0), new uint8[](0), new uint256[](0));
+        uint256 end = fromIndex + limit;
+        if (end > count) end = count;
+        uint256 n = end - fromIndex;
+        destIds = new bytes32[](n);
+        ratings = new uint8[](n);
+        atBlocks = new uint256[](n);
+        uint256 skipped = 0;
+        uint256 j = 0;
+        for (uint256 i = 0; i < _reviews.length && j < n; i++) {
+            if (_reviews[i].traveler != traveler) continue;
+            if (skipped < fromIndex) { skipped++; continue; }
+            destIds[j] = _reviews[i].destId;
+            ratings[j] = _reviews[i].rating;
+            atBlocks[j] = _reviews[i].atBlock;
+            j++;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // EXTRA VIEWS: Guides (list with profiles)
+    // -------------------------------------------------------------------------
+
+    function getGuideList(uint256 fromIndex, uint256 limit) external view returns (
